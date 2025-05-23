@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'calendar_screen.dart';
 import 'standings_screen.dart';
+import 'settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -21,11 +22,12 @@ class _MainScreenState extends State<MainScreen> {
     _screens = [
       HomeScreen(onSeeAllStandings: () {
         setState(() {
-          _currentIndex = 2; // Index for 'Classifica'
+          _currentIndex = 1; // Index for 'Classifica'
         });
       }),
-      const CalendarScreen(),
       const StandingsScreen(),
+      const CalendarScreen(),
+      const SettingsScreen(),
     ];
   }
 
@@ -50,12 +52,16 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_month),
-            label: 'Calendar',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.leaderboard),
             label: 'Classifica',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month),
+            label: 'Calendario',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Impostazioni',
           ),
         ],
       ),

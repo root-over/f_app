@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/driver_standing.dart';
 import '../models/constructor_standing.dart';
+import '../models/race.dart';
 
 class ApiService {
   static const String _baseUrl = 'https://api.jolpi.ca/ergast/f1'; // Updated base URL
@@ -68,6 +69,19 @@ class ApiService {
       }
     } else {
       throw Exception('Failed to load constructor standings. Status code: ${response.statusCode}, Body: ${response.body}');
+    }
+  }
+
+  Future<List<Race>> getRaces({int? year}) async {
+    final int queryYear = year ?? DateTime.now().year;
+    final url = '$_baseUrl/$queryYear/races.json';
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final decodedBody = jsonDecode(response.body);
+      final racesJson = decodedBody['MRData']['RaceTable']['Races'] as List<dynamic>;
+      return racesJson.map((json) => Race.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load races. Status code: ${response.statusCode}, Body: ${response.body}');
     }
   }
 }
