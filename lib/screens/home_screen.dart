@@ -7,7 +7,8 @@ import '../widgets/latest_news.dart';
 import '../widgets/team_selector.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onSeeAllStandings;
+  const HomeScreen({super.key, this.onSeeAllStandings});
 
   @override
   Widget build(BuildContext context) {
@@ -25,16 +26,18 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: const SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            NextRaceCard(),
-            SizedBox(height: 20),
-            StandingsPreview(),
-            SizedBox(height: 20),
-            LatestNews(),
+            const NextRaceCard(),
+            const SizedBox(height: 20),
+            StandingsPreview(
+              onSeeAll: onSeeAllStandings,
+            ),
+            const SizedBox(height: 20),
+            const LatestNews(),
           ],
         ),
       ),

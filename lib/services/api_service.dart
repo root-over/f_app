@@ -22,7 +22,6 @@ class ApiService {
     //   url += '?round=$round'; // This is an assumption if API supports round as query
     // }
 
-    print('Requesting URL: $url');
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -37,13 +36,9 @@ class ApiService {
         List<DriverStanding> standings = standingsData.map((dynamic item) => DriverStanding.fromJson(item)).toList();
         return standings;
       } else {
-        print('Failed to parse driver standings: Unexpected JSON structure');
-        print('Response body: ${response.body}');
         throw Exception('Failed to parse driver standings: Unexpected JSON structure. Body: ${response.body}');
       }
     } else {
-      print('Failed to load driver standings. Status code: ${response.statusCode}');
-      print('Response body: ${response.body}');
       throw Exception('Failed to load driver standings. Status code: ${response.statusCode}, Body: ${response.body}');
     }
   }
@@ -55,7 +50,6 @@ class ApiService {
     // Similar to driver standings, round parameter might not be part of this specific path.
     // Example: /ergast/f1/2024/constructorstandings.json
 
-    print('Requesting URL: $url');
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -70,13 +64,9 @@ class ApiService {
         List<ConstructorStanding> standings = standingsData.map((dynamic item) => ConstructorStanding.fromJson(item)).toList();
         return standings;
       } else {
-        print('Failed to parse constructor standings: Unexpected JSON structure');
-        print('Response body: ${response.body}');
         throw Exception('Failed to parse constructor standings: Unexpected JSON structure. Body: ${response.body}');
       }
     } else {
-      print('Failed to load constructor standings. Status code: ${response.statusCode}');
-      print('Response body: ${response.body}');
       throw Exception('Failed to load constructor standings. Status code: ${response.statusCode}, Body: ${response.body}');
     }
   }

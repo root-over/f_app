@@ -42,7 +42,7 @@ class F1Themes {
         foregroundColor: _getContrastColor(teamData.secondaryColor),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: teamData.primaryColor.withOpacity(0.1),
+        backgroundColor: teamData.primaryColor.withAlpha((255 * 0.1).round()),
         labelStyle: TextStyle(color: teamData.primaryColor),
         side: BorderSide(color: teamData.primaryColor),
       ),

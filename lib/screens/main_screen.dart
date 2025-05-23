@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-import 'drivers_screen.dart';
-import 'teams_screen.dart';
 import 'calendar_screen.dart';
 import 'standings_screen.dart';
 
@@ -15,16 +13,29 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const DriversScreen(),
-    const TeamsScreen(),
-    const CalendarScreen(),
-    const StandingsScreen(),
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      HomeScreen(onSeeAllStandings: () {
+        setState(() {
+          _currentIndex = 2; // Index for 'Classifica'
+        });
+      }),
+      const CalendarScreen(),
+      const StandingsScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Adjust current index if it's out of bounds after removing screens
+    if (_currentIndex >= _screens.length) {
+      _currentIndex = _screens.length - 1;
+    }
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -37,14 +48,6 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Piloti',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.groups),
-            label: 'Team',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_month),

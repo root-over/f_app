@@ -7,24 +7,38 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:f_app/main.dart';
+import 'package:f_app/screens/main_screen.dart'; // Import MainScreen
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('MainScreen loads and shows Home tab', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const F1App());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that the MainScreen is present.
+    expect(find.byType(MainScreen), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verify that the "Home" tab is initially selected and visible.
+    // Note: This assumes the BottomNavigationBarItem for Home has the label 'Home'.
+    // It also checks for the presence of the HomeScreen content if possible, 
+    // or a key widget within HomeScreen.
+    expect(find.widgetWithText(BottomNavigationBarItem, 'Home'), findsOneWidget);
+    // expect(find.text('Home'), findsWidgets); // This might find multiple instances, be more specific
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // You could also verify the presence of a key widget from HomeScreen if you know one
+    // For example, if HomeScreen has a Text widget with 'Welcome to F1 Hub':
+    // expect(find.text('Welcome to F1 Hub'), findsOneWidget);
+
+    // Example: Verify that the "Classifica" tab is present
+    expect(find.widgetWithText(BottomNavigationBarItem, 'Classifica'), findsOneWidget);
+
+    // Example: Tap the "Classifica" tab and verify navigation
+    await tester.tap(find.widgetWithText(BottomNavigationBarItem, 'Classifica'));
+    await tester.pumpAndSettle(); // pumpAndSettle to wait for animations/transitions
+
+    // Verify that StandingsScreen is now active (or a key widget within it)
+    // This depends on how StandingsScreen indicates its presence.
+    // For example, if it has an AppBar with title 'Classifiche':
+    expect(find.text('Classifiche'), findsOneWidget);
   });
 }
