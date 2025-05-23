@@ -4,7 +4,8 @@ import '../models/driver_standing.dart';
 import '../models/constructor_standing.dart';
 import 'driver_detail_screen.dart'; 
 import 'team_detail_screen.dart';   
-import '../core/theme/f1_teams.dart'; 
+import '../core/theme/f1_teams.dart';
+import '../core/utils/driver_image_utils.dart'; 
 
 class StandingsScreen extends StatefulWidget {
   const StandingsScreen({super.key});
@@ -136,17 +137,71 @@ class _DriversStandingsListState extends State<_DriversStandingsList> {
           itemCount: drivers.length,
           itemBuilder: (context, index) {
             final driverStanding = drivers[index]; // Renamed for clarity
+            final driverImagePath = DriverImageUtils.getDriverImagePath(driverStanding.driver.familyName);
+            
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: Hero(
-                  tag: 'driver_standings_${driverStanding.driver.driverId}_${widget.year}', 
-                  child: CircleAvatar(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: Text(
-                      driverStanding.position.toString(),
-                      style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontWeight: FontWeight.bold),
-                    ),
+                leading: SizedBox(
+                  width: 80, // Fixed width to ensure consistent layout
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Position number
+                      Container(
+                        width: 24,
+                        alignment: Alignment.center,
+                        child: Text(
+                          driverStanding.position.toString(),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Driver image or fallback avatar
+                      Hero(
+                        tag: DriverImageUtils.getDriverHeroTag(driverStanding.driver.driverId, widget.year),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.transparent,
+                          child: driverImagePath != null
+                              ? ClipOval(
+                                  child: Image.asset(
+                                    driverImagePath,
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      // Fallback to position number if image fails to load
+                                      return CircleAvatar(
+                                        backgroundColor: Theme.of(context).colorScheme.primary,
+                                        child: Text(
+                                          driverStanding.position.toString(),
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.onPrimary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                )
+                              : CircleAvatar(
+                                  backgroundColor: Theme.of(context).colorScheme.primary,
+                                  child: Text(
+                                    driverStanding.position.toString(),
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 title: Text('${driverStanding.driver.givenName} ${driverStanding.driver.familyName}', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -203,6 +258,51 @@ class _ConstructorsStandingsListState extends State<_ConstructorsStandingsList> 
     _constructorStandingsFuture = widget.apiService.getConstructorStandings(year: widget.year);
   }
   
+  // Map constructor names to their logo file names
+  String? _getTeamLogoPath(String constructorName) {
+    final lowerConstructorName = constructorName.toLowerCase().trim();
+    
+    // Map of constructor names to their corresponding logo asset files (using PNG format)
+    final teamLogoMap = {
+      'ferrari': 'assets/team_logo/altri/ferrari.png',
+      'scuderia ferrari': 'assets/team_logo/altri/ferrari.png',
+      
+      'mercedes': 'assets/team_logo/altri/mercedes.png',
+      'mercedes-amg': 'assets/team_logo/altri/mercedes.png',
+      'mercedes-amg petronas': 'assets/team_logo/altri/mercedes.png',
+      
+      'red bull': 'assets/team_logo/altri/red_bull_racing.png',
+      'red bull racing': 'assets/team_logo/altri/red_bull_racing.png',
+      
+      'mclaren': 'assets/team_logo/altri/mclaren.png',
+      'mclaren f1 team': 'assets/team_logo/altri/mclaren.png',
+      
+      'alpine': 'assets/team_logo/altri/alpine.png',
+      'alpine f1 team': 'assets/team_logo/altri/alpine.png',
+      
+      'aston martin': 'assets/team_logo/altri/aston_martin.png',
+      'aston martin aramco': 'assets/team_logo/altri/aston_martin.png',
+      
+      'haas': 'assets/team_logo/altri/haas.png',
+      'haas f1 team': 'assets/team_logo/altri/haas.png',
+      
+      'alphatauri': 'assets/team_logo/altri/racing_bulls.png',
+      'rb': 'assets/team_logo/altri/racing_bulls.png',
+      'racing bulls': 'assets/team_logo/altri/racing_bulls.png',
+      'visa rb': 'assets/team_logo/altri/racing_bulls.png',
+      
+      'alfa romeo': 'assets/team_logo/altri/kick_sauber.png',
+      'sauber': 'assets/team_logo/altri/kick_sauber.png',
+      'kick sauber': 'assets/team_logo/altri/kick_sauber.png',
+      'stake f1 team': 'assets/team_logo/altri/kick_sauber.png',
+      
+      'williams': 'assets/team_logo/altri/williams.png',
+      'williams racing': 'assets/team_logo/altri/williams.png',
+    };
+    
+    return teamLogoMap[lowerConstructorName];
+  }
+  
   F1Team? _getTeamEnumFromName(String constructorName) {
     // Corrected enum names and added fallbacks
     final lowerConstructorName = constructorName.toLowerCase();
@@ -246,42 +346,87 @@ class _ConstructorsStandingsListState extends State<_ConstructorsStandingsList> 
           itemBuilder: (context, index) {
             final constructorStanding = constructors[index]; // Renamed for clarity
             final teamEnum = _getTeamEnumFromName(constructorStanding.constructor.name);
-            final teamData = teamEnum != null ? F1Teams.getTeamData(teamEnum) : null; // Use F1Teams.getTeamData static method
-
-            Widget logoWidget;
-            if (teamData != null && teamData.logo != null && teamData.logo!.isNotEmpty) {
-              bool isAsset = teamData.logo!.contains('.png') || teamData.logo!.contains('.svg');
-              if (isAsset) {
-                logoWidget = Padding(
-                  padding: const EdgeInsets.all(0),
-                  child: Image.asset(teamData.logo!, fit: BoxFit.contain),
-                );
-              } else {
-                logoWidget = Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: Text(teamData.logo!, style: const TextStyle(fontSize: 20)),
-                );
-              }
-            } else {
-              logoWidget = Text(
-                constructorStanding.position.toString(),
-                style: TextStyle(
-                  color: (teamData?.primaryColor ?? Theme.of(context).colorScheme.primary).computeLuminance() > 0.5 
-                      ? Colors.black 
-                      : Colors.white, 
-                  fontWeight: FontWeight.bold
-                ),
-              );
-            }
+            final teamData = teamEnum != null ? F1Teams.getTeamData(teamEnum) : null;
+            final teamLogoPath = _getTeamLogoPath(constructorStanding.constructor.name);
 
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: Hero(
-                  tag: 'constructor_standings_${constructorStanding.constructor.constructorId}_${widget.year}',
-                  child: CircleAvatar(
-                    backgroundColor: teamData?.primaryColor ?? Theme.of(context).colorScheme.primary,
-                    child: logoWidget,
+                leading: SizedBox(
+                  width: 80, // Fixed width to ensure consistent layout
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Position number
+                      Container(
+                        width: 24,
+                        alignment: Alignment.center,
+                        child: Text(
+                          constructorStanding.position.toString(),
+                          style: TextStyle(
+                            color: teamData?.primaryColor ?? Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Team logo or fallback avatar
+                      Hero(
+                        tag: 'constructor_standings_${constructorStanding.constructor.constructorId}_${widget.year}',
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.transparent,
+                          child: teamLogoPath != null
+                              ? ClipOval(
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(4.0),
+                                      child: Image.asset(
+                                        teamLogoPath,
+                                        width: 32,
+                                        height: 32,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          // Fallback to position number if image fails to load
+                                          return CircleAvatar(
+                                            backgroundColor: teamData?.primaryColor ?? Theme.of(context).colorScheme.primary,
+                                            child: Text(
+                                              constructorStanding.position.toString(),
+                                              style: TextStyle(
+                                                color: (teamData?.primaryColor ?? Theme.of(context).colorScheme.primary).computeLuminance() > 0.5 
+                                                    ? Colors.black 
+                                                    : Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : CircleAvatar(
+                                  backgroundColor: teamData?.primaryColor ?? Theme.of(context).colorScheme.primary,
+                                  child: Text(
+                                    constructorStanding.position.toString(),
+                                    style: TextStyle(
+                                      color: (teamData?.primaryColor ?? Theme.of(context).colorScheme.primary).computeLuminance() > 0.5 
+                                          ? Colors.black 
+                                          : Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 title: Text(constructorStanding.constructor.name, style: const TextStyle(fontWeight: FontWeight.bold)),

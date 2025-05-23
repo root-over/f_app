@@ -51,9 +51,36 @@ class TeamSelector extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            teamData.logo,
-                            style: const TextStyle(fontSize: 20),
+                          SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: Image.asset(
+                              teamData.logo,
+                              width: 32,
+                              height: 32,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                // Fallback to team initial if image fails to load
+                                return Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: teamData.secondaryColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      teamData.name.substring(0, 1).toUpperCase(),
+                                      style: TextStyle(
+                                        color: teamData.accentColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(

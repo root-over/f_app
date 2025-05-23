@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../models/race.dart';
 import '../screens/race_detail_screen.dart';
 import '../services/api_service.dart';
+import '../providers/timezone_provider.dart';
 
 class NextRaceCard extends StatefulWidget {
   const NextRaceCard({super.key});
@@ -38,6 +41,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
 
   @override
   Widget build(BuildContext context) {
+    final timezoneProvider = Provider.of<TimezoneProvider>(context);
     return FutureBuilder<Race?>(
       future: _nextRaceFuture,
       builder: (context, snapshot) {
@@ -58,17 +62,18 @@ class _NextRaceCardState extends State<NextRaceCard> {
           );
         }
         final race = snapshot.data!;
+        final now = tz.TZDateTime.now(timezoneProvider.currentLocation);
         final raceDateTimeUtc = DateTime.parse('${race.date}T${race.time}');
-        final raceDateTimeLocal = raceDateTimeUtc.toLocal();
+        final raceDateTimeLocal = tz.TZDateTime.from(raceDateTimeUtc, timezoneProvider.currentLocation);
         final localTimeString = DateFormat.Hm().format(raceDateTimeLocal);
         final localDateString = DateFormat('d MMMM yyyy', 'it_IT').format(raceDateTimeLocal);
-        final now = DateTime.now();
         final difference = raceDateTimeLocal.difference(now);
         String timeLeft = '';
         Widget? statusWidget;
         if (difference.inSeconds > 0) {
           // Calcolo giorni: ogni scatto di mezzanotte conta come un giorno
-          int giorni = raceDateTimeLocal.difference(DateTime(now.year, now.month, now.day)).inDays;
+          final todayTz = tz.TZDateTime(timezoneProvider.currentLocation, now.year, now.month, now.day);
+          int giorni = raceDateTimeLocal.difference(todayTz).inDays;
           if (giorni > 0) {
             final giornoLabel = giorni == 1 ? 'giorno' : 'giorni';
             timeLeft = 'Tra $giorni $giornoLabel';
@@ -98,7 +103,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.withOpacity(0.5),
+                      color: const Color(0xFF4CAF50).withOpacity(0.5), // Usa un colore non deprecato
                       blurRadius: 8,
                       spreadRadius: 1,
                     ),

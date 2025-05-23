@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:provider/provider.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../models/race.dart';
+import '../providers/timezone_provider.dart';
 
 class RaceDetailScreen extends StatelessWidget {
   final Race race;
   final List<RaceSession> sessions;
   const RaceDetailScreen({super.key, required this.race, required this.sessions});
 
-  String _formatSessionLocal(String date, String time) {
+  String _formatSessionLocal(BuildContext context, String date, String time) {
     try {
-      final dtUtc = DateTime.parse("${date}T${time}");
-      final dtLocal = dtUtc.toLocal();
-      final dateStr = DateFormat('d MMMM yyyy', 'it_IT').format(dtLocal);
-      final timeStr = DateFormat.Hm().format(dtLocal);
+      final timezoneProvider = Provider.of<TimezoneProvider>(context, listen: false);
+      final dtUtc = DateTime.parse('$date' 'T' '$time');
+      final dtTz = tz.TZDateTime.from(dtUtc, timezoneProvider.currentLocation);
+      final dateStr = DateFormat('d MMMM yyyy', 'it_IT').format(dtTz);
+      final timeStr = DateFormat.Hm().format(dtTz);
       return '$dateStr, ore $timeStr';
     } catch (_) {
       return '$date $time';
@@ -34,13 +38,13 @@ class RaceDetailScreen extends StatelessWidget {
           children: [
             Text(race.circuit.circuitName, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text('Data gara: ${_formatSessionLocal(race.date, race.time)}'),
+            Text('Data gara: ${_formatSessionLocal(context, race.date, race.time)}'),
             const SizedBox(height: 16),
             Text('Sessioni:', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             ...sessions.map((session) => ListTile(
               title: Text(session.name),
-              subtitle: Text(_formatSessionLocal(session.date, session.time)),
+              subtitle: Text(_formatSessionLocal(context, session.date, session.time)),
             )),
             const SizedBox(height: 16),
             TextButton(

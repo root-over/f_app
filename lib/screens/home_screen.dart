@@ -1,11 +1,8 @@
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../core/theme/theme_provider.dart';
 import '../widgets/next_race_card.dart';
 import '../widgets/standings_preview.dart';
 import '../widgets/latest_news.dart';
-import '../widgets/team_selector.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onSeeAllStandings;
