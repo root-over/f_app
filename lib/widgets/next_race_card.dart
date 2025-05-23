@@ -103,7 +103,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF4CAF50).withOpacity(0.5), // Usa un colore non deprecato
+                      color: const Color(0xFF4CAF50).withAlpha((255 * 0.5).round()), // Usa un colore non deprecato
                       blurRadius: 8,
                       spreadRadius: 1,
                     ),

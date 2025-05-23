@@ -313,8 +313,8 @@ class _ConstructorsStandingsListState extends State<_ConstructorsStandingsList> 
     if (lowerConstructorName.contains('alpine')) return F1Team.alpine;
     if (lowerConstructorName.contains('aston martin')) return F1Team.astonMartin;
     if (lowerConstructorName.contains('haas')) return F1Team.haas;
-    if (lowerConstructorName.contains('alphatauri') || lowerConstructorName.contains('rb') || lowerConstructorName.contains('racing bulls')) return F1Team.alphaTauri;
-    if (lowerConstructorName.contains('alfa romeo') || lowerConstructorName.contains('sauber') || lowerConstructorName.contains('kick sauber') || lowerConstructorName.contains('stake')) return F1Team.alfaRomeo; // Corrected to alfaRomeo, assuming Sauber is represented by it
+    if (lowerConstructorName.contains('alphatauri') || lowerConstructorName.contains('rb') || lowerConstructorName.contains('racing bulls')) return F1Team.racingBulls;
+    if (lowerConstructorName.contains('alfa romeo') || lowerConstructorName.contains('sauber') || lowerConstructorName.contains('kick sauber') || lowerConstructorName.contains('stake')) return F1Team.kickSauber;
     if (lowerConstructorName.contains('williams')) return F1Team.williams;
     
     // Direct match attempt

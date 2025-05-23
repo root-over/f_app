@@ -9,11 +9,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:f_app/main.dart';
 import 'package:f_app/screens/main_screen.dart'; // Import MainScreen
+import 'package:f_app/core/theme/theme_provider.dart'; // Import ThemeProvider
+import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
 
 void main() {
   testWidgets('MainScreen loads and shows Home tab', (WidgetTester tester) async {
+    // Mock SharedPreferences for ThemeProvider initialization
+    SharedPreferences.setMockInitialValues({});
+    final themeProvider = ThemeProvider();
+    await themeProvider.initialize();
+
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const F1App());
+    await tester.pumpWidget(F1App(themeProvider: themeProvider));
 
     // Verify that the MainScreen is present.
     expect(find.byType(MainScreen), findsOneWidget);

@@ -36,7 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => themeProvider.setThemeMode(ThemeMode.light),
+                  onPressed: () async => await themeProvider.setThemeMode(ThemeMode.light),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                   ),
@@ -46,7 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => themeProvider.setThemeMode(ThemeMode.dark),
+                  onPressed: () async => await themeProvider.setThemeMode(ThemeMode.dark),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.secondary,
                   ),
@@ -56,7 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => themeProvider.setThemeMode(ThemeMode.system),
+                  onPressed: () async => await themeProvider.setThemeMode(ThemeMode.system),
                   child: const Text('Sistema'),
                 ),
               ),
@@ -73,10 +73,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               return ChoiceChip(
                 label: Text(teamData.name),
                 selected: themeProvider.currentTeam == team,
-                onSelected: (_) => themeProvider.setTeam(team),
+                onSelected: (_) async => await themeProvider.setTeam(team),
                 avatar: Text(teamData.logo),
-                selectedColor: teamData.primaryColor.withOpacity(0.2),
-                backgroundColor: teamData.primaryColor.withOpacity(0.08),
+                selectedColor: teamData.primaryColor.withAlpha((255*0.2).round()),
+                backgroundColor: teamData.primaryColor.withAlpha((255*0.08).round()),
                 labelStyle: TextStyle(
                   color: themeProvider.currentTeam == team
                       ? teamData.primaryColor
