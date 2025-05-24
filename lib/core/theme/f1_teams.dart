@@ -53,9 +53,9 @@ class F1Teams {
     F1Team.redBull: F1TeamData(
       name: 'Red Bull',
       fullName: 'Oracle Red Bull Racing',
-      primaryColor: Color(0xFF0600EF),  // Blu Red Bull intenso
-      secondaryColor: Color(0xFFB90000), // Rosso intenso 
-      accentColor: Color(0xFFFFCC00),   // Oro più vivace
+      primaryColor: Color(0xFF1F3ADB),  // Blu Red Bull leggermente più chiaro
+      secondaryColor: Color(0xFFD40000), // Rosso più intenso e brillante
+      accentColor: Color(0xFFFFDD33),   // Oro più luminoso per miglior contrasto
       logo: 'assets/team_logo/altri/red_bull_racing.png',
     ),
     F1Team.mcLaren: F1TeamData(
@@ -85,17 +85,17 @@ class F1Teams {
     F1Team.williams: F1TeamData(
       name: 'Williams',
       fullName: 'Williams Racing',
-      primaryColor: Color(0xFF0053D0),  // Blu Williams più profondo
+      primaryColor: Color(0xFF0046B8),  // Blu Williams più scuro e intenso per miglior contrasto
       secondaryColor: Color(0xFF00A0FF), // Azzurro
-      accentColor: Color(0xFFF5F5F5),   // Bianco-grigio
+      accentColor: Color(0xFFFFFFFF),   // Bianco puro per miglior contrasto
       logo: 'assets/team_logo/altri/williams.png',
     ),
     F1Team.racingBulls: F1TeamData(
       name: 'Racing Bulls',
       fullName: 'Visa Cash App RB F1 Team',
-      primaryColor: Color(0xFF0B2539),  // Blu navy scuro
+      primaryColor: Color(0xFF102E4A),  // Blu navy più chiaro per miglior contrasto
       secondaryColor: Color(0xFFE90000), // Rosso brillante
-      accentColor: Color(0xFFFFFFFF),   // Bianco
+      accentColor: Color(0xFF00DFFF),   // Azzurro brillante per miglior contrasto col blu scuro
       logo: 'assets/team_logo/altri/racing_bulls.png',
     ),
     F1Team.kickSauber: F1TeamData(
@@ -109,9 +109,9 @@ class F1Teams {
     F1Team.haas: F1TeamData(
       name: 'Haas',
       fullName: 'MoneyGram Haas F1 Team',
-      primaryColor: Color(0xFFFFFFFF),  // Bianco
+      primaryColor: Color(0xFF212121),  // Grigio scuro invece di bianco per miglior contrasto
       secondaryColor: Color(0xFF000000), // Nero
-      accentColor: Color(0xFFE10600),   // Rosso vibrante
+      accentColor: Color(0xFFFF0800),   // Rosso più brillante
       logo: 'assets/team_logo/altri/haas.png',
     ),
   };

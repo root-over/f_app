@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
-import '../lib/core/theme/theme_provider.dart';
-import '../lib/core/theme/f1_teams.dart';
+import 'package:f_app/core/theme/theme_provider.dart';
+import 'package:f_app/core/theme/f1_teams.dart';
 
 void main() {
   group('ThemeProvider Persistence Tests', () {

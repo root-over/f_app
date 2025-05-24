@@ -27,7 +27,7 @@ class F1Themes {
           letterSpacing: 0.5, // Migliore leggibilità
           color: _getContrastColor(teamData.primaryColor),
         ),
-        shadowColor: teamData.secondaryColor.withOpacity(0.5),
+        shadowColor: teamData.secondaryColor.withAlpha((255 * 0.5).round()),
         iconTheme: IconThemeData(
           color: _getContrastColor(teamData.primaryColor),
           size: 24, // Icone leggermente più grandi
@@ -37,7 +37,7 @@ class F1Themes {
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: teamData.primaryColor,
         selectedItemColor: teamData.accentColor,
-        unselectedItemColor: _getContrastColor(teamData.primaryColor).withAlpha((255*0.6).round()),
+        unselectedItemColor: _getContrastColor(teamData.primaryColor).withAlpha((255*0.8).round()), // Miglior contrasto
         selectedIconTheme: IconThemeData(size: 28, color: teamData.accentColor),
         unselectedIconTheme: IconThemeData(size: 24),
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -51,7 +51,7 @@ class F1Themes {
         shadowColor: teamData.primaryColor.withAlpha((255*0.3).round()),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: teamData.primaryColor.withOpacity(0.1), width: 1),
+          side: BorderSide(color: teamData.primaryColor.withAlpha((255 * 0.1).round()), width: 1),
         ),
         color: Colors.white,
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -61,7 +61,7 @@ class F1Themes {
         backgroundColor: teamData.secondaryColor,
         foregroundColor: _getContrastColor(teamData.secondaryColor),
         elevation: 8,
-        splashColor: teamData.accentColor.withOpacity(0.3),
+        splashColor: teamData.accentColor.withAlpha((255 * 0.3).round()),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -103,7 +103,7 @@ class F1Themes {
       // Miglioramento TabBar
       tabBarTheme: TabBarThemeData(
         labelColor: _getContrastColor(teamData.primaryColor),
-        unselectedLabelColor: _getContrastColor(teamData.primaryColor).withAlpha((255*0.6).round()),
+        unselectedLabelColor: _getContrastColor(teamData.primaryColor).withAlpha((255*0.85).round()), // Miglior contrasto
         indicatorColor: teamData.accentColor,
         indicatorSize: TabBarIndicatorSize.label,
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -136,9 +136,9 @@ class F1Themes {
         secondary: teamData.secondaryColor,
         tertiary: teamData.accentColor,
         brightness: Brightness.dark,
-        background: darkBackgroundColor,
         surface: const Color(0xFF1E1E1E),
-        onSurface: Colors.white.withOpacity(0.87),
+        surfaceTint: darkBackgroundColor, // Replacing deprecated 'background'
+        onSurface: Colors.white.withAlpha((255 * 0.87).round()),
       ),
       // Miglioramento AppBar in dark mode
       appBarTheme: AppBarTheme(
@@ -162,7 +162,7 @@ class F1Themes {
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: const Color(0xFF1A1A1A),
         selectedItemColor: teamData.primaryColor,
-        unselectedItemColor: Colors.grey.shade400,
+        unselectedItemColor: Colors.grey.shade300, // Grigio più chiaro per miglior contrasto in dark mode
         selectedIconTheme: IconThemeData(size: 28, color: teamData.primaryColor),
         unselectedIconTheme: const IconThemeData(size: 24),
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -176,7 +176,7 @@ class F1Themes {
         shadowColor: Colors.black45,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: teamData.primaryColor.withOpacity(0.2), width: 1),
+          side: BorderSide(color: teamData.primaryColor.withAlpha((255 * 0.2).round()), width: 1),
         ),
         color: const Color(0xFF2D2D2D),
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -186,25 +186,25 @@ class F1Themes {
         backgroundColor: teamData.primaryColor,
         foregroundColor: _getContrastColor(teamData.primaryColor),
         elevation: 8,
-        splashColor: teamData.accentColor.withOpacity(0.3),
+        splashColor: teamData.accentColor.withAlpha((255 * 0.3).round()),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
       ),
       // Miglioramento Chip in dark mode
       chipTheme: ChipThemeData(
-        backgroundColor: teamData.primaryColor.withOpacity(0.2),
+        backgroundColor: teamData.primaryColor.withAlpha((255 * 0.2).round()),
         labelStyle: TextStyle(
           color: teamData.primaryColor,
           fontWeight: FontWeight.w500,
         ),
-        side: BorderSide(color: teamData.primaryColor.withOpacity(0.4)),
+        side: BorderSide(color: teamData.primaryColor.withAlpha((255 * 0.4).round())),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
         shadowColor: Colors.black38,
         elevation: 3,
-        selectedColor: teamData.primaryColor.withOpacity(0.4),
+        selectedColor: teamData.primaryColor.withAlpha((255 * 0.4).round()),
         checkmarkColor: teamData.accentColor,
       ),
       // Miglioramento stile dei pulsanti in dark mode
@@ -228,7 +228,7 @@ class F1Themes {
       // Miglioramento TabBar in dark mode
       tabBarTheme: TabBarThemeData(
         labelColor: teamData.primaryColor,
-        unselectedLabelColor: Colors.grey.shade400,
+        unselectedLabelColor: Colors.grey.shade200, // Grigio più chiaro per contrasto migliore
         indicatorColor: teamData.primaryColor,
         indicatorSize: TabBarIndicatorSize.label,
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -238,7 +238,7 @@ class F1Themes {
       listTileTheme: ListTileThemeData(
         tileColor: Colors.transparent,
         iconColor: teamData.primaryColor,
-        textColor: Colors.white.withOpacity(0.87),
+        textColor: Colors.white.withAlpha((255 * 0.87).round()),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),

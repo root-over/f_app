@@ -69,6 +69,34 @@ class DriverDetailScreen extends StatelessWidget {
     }
   }
 
+  /// Create text with outline for better contrast in any theme
+  static Widget _createTextWithOutline({
+    required String text,
+    required TextStyle style,
+    Color outlineColor = const Color.fromARGB(255, 255, 255, 255),
+    double outlineWidth = 1.0,
+  }) {
+    return Stack(
+      children: [
+        // Outlines - creating 8 slightly offset copies for a complete outline effect
+        Text(
+          text,
+          style: style.copyWith(
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = outlineWidth
+              ..color = outlineColor,
+          ),
+        ),
+        // Main text on top
+        Text(
+          text,
+          style: style,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final driver = driverStanding.driver;
@@ -86,18 +114,15 @@ class DriverDetailScreen extends StatelessWidget {
             expandedHeight: 300,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                '${driver.givenName} ${driver.familyName}',
+              title: _createTextWithOutline(
+                text: '${driver.givenName} ${driver.familyName}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  shadows: [
-                    Shadow(
-                      blurRadius: 10.0,
-                      color: Colors.black54,
-                      offset: Offset(1.0, 1.0),
-                    ),
-                  ],
+                  fontSize: 22,
+                  color: Colors.white,
                 ),
+                outlineColor: Colors.black,
+                outlineWidth: 1.5,
               ),
               background: Stack(
                 fit: StackFit.expand,
@@ -391,8 +416,9 @@ class _InfoRow extends StatelessWidget {
             flex: 3,
             child: Text(
               value,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],

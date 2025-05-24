@@ -20,8 +20,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final timezoneProvider = Provider.of<TimezoneProvider>(context);
-    final _timezoneMode = timezoneProvider.mode;
-    final _timezones = tz.timeZoneDatabase.locations.keys.toList()..sort();
+    final timezoneMode = timezoneProvider.mode;
+    final timezones = tz.timeZoneDatabase.locations.keys.toList()..sort();
     _selectedTimezone = timezoneProvider.manualTimezone;
     return Scaffold(
       appBar: AppBar(
@@ -92,7 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Automatico (consigliato)'),
             leading: Radio<String>(
               value: 'auto',
-              groupValue: _timezoneMode,
+              groupValue: timezoneMode,
               onChanged: (value) {
                 timezoneProvider.setMode('auto');
                 setState(() {});
@@ -103,14 +103,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Manuale'),
             leading: Radio<String>(
               value: 'manual',
-              groupValue: _timezoneMode,
+              groupValue: timezoneMode,
               onChanged: (value) {
                 timezoneProvider.setMode('manual');
                 setState(() {});
               },
             ),
           ),
-          if (_timezoneMode == 'manual') ...[
+          if (timezoneMode == 'manual') ...[
             TextField(
               decoration: const InputDecoration(
                 labelText: 'Cerca fuso orario',
@@ -120,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() {
                   _searchQuery = value;
                   // Reset la selezione se il valore corrente non è più visibile
-                  if (_selectedTimezone != null && !_timezones.where((tzName) => _searchQuery.isEmpty || tzName.toLowerCase().contains(_searchQuery.toLowerCase())).contains(_selectedTimezone)) {
+                  if (_selectedTimezone != null && !timezones.where((tzName) => _searchQuery.isEmpty || tzName.toLowerCase().contains(_searchQuery.toLowerCase())).contains(_selectedTimezone)) {
                     _selectedTimezone = null;
                     timezoneProvider.setManualTimezone('');
                   }
@@ -131,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _selectedTimezone,
               hint: const Text('Seleziona fuso orario'),
               isExpanded: true,
-              items: _timezones
+              items: timezones
                   .where((tzName) => _searchQuery.isEmpty || tzName.toLowerCase().contains(_searchQuery.toLowerCase()))
                   .map((tzName) => DropdownMenuItem(
                         value: tzName,
