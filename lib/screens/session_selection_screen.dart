@@ -6,10 +6,28 @@ import '../models/race.dart';
 import '../providers/timezone_provider.dart';
 import 'session_results_screen.dart';
 
-class SessionSelectionScreen extends StatelessWidget {
+class SessionSelectionScreen extends StatefulWidget {
   final Race race;
 
   const SessionSelectionScreen({super.key, required this.race});
+
+  @override
+  State<SessionSelectionScreen> createState() => _SessionSelectionScreenState();
+}
+
+class _SessionSelectionScreenState extends State<SessionSelectionScreen> {
+  // Add refresh indicator key for pull-to-refresh
+  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
+
+  // Add refresh handler method
+  Future<void> _handleRefresh() async {
+    // For now, just simulate a refresh delay and rebuild the UI
+    // In a real app, this might reload race data from the API
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   String _formatSessionLocal(BuildContext context, String date, String time) {
     try {
@@ -86,7 +104,7 @@ class SessionSelectionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(race.raceName),
+        title: Text(widget.race.raceName),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
@@ -110,7 +128,7 @@ class SessionSelectionScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  race.circuit.circuitName,
+                  widget.race.circuit.circuitName,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onPrimary,
                     fontSize: 18,
@@ -128,105 +146,110 @@ class SessionSelectionScreen extends StatelessWidget {
               ],
             ),
           ),
-          // Sessions list
+          // Sessions list with pull-to-refresh
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: race.sessions.length,
-              itemBuilder: (context, index) {
-                final session = race.sessions[index];
-                final statusColor = _getSessionStatusColor(session);
-                final status = _getSessionStatus(session);
-                final icon = _getSessionIcon(session.name);
-                
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  elevation: 4,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SessionResultsScreen(
-                            race: race,
-                            session: session,
+            child: RefreshIndicator(
+              key: _refreshIndicatorKey,
+              onRefresh: _handleRefresh,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: widget.race.sessions.length,
+                itemBuilder: (context, index) {
+                  final session = widget.race.sessions[index];
+                  final statusColor = _getSessionStatusColor(session);
+                  final status = _getSessionStatus(session);
+                  final icon = _getSessionIcon(session.name);
+                  
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    elevation: 4,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SessionResultsScreen(
+                              race: widget.race,
+                              session: session,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          // Session icon
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: statusColor.withAlpha(50),
-                              borderRadius: BorderRadius.circular(25),
-                              border: Border.all(
-                                color: statusColor.withAlpha(100),
-                                width: 2,
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            // Session icon
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: statusColor.withAlpha(50),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: statusColor.withAlpha(100),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                icon,
+                                color: statusColor,
+                                size: 24,
                               ),
                             ),
-                            child: Icon(
-                              icon,
-                              color: statusColor,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          // Session info
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  session.name,
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _formatSessionLocal(context, session.date, session.time),
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withAlpha(50),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    status,
-                                    style: TextStyle(
-                                      color: statusColor,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
+                            const SizedBox(width: 16),
+                            // Session info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    session.name,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _formatSessionLocal(context, session.date, session.time),
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withAlpha(50),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      status,
+                                      style: TextStyle(
+                                        color: statusColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          // Arrow
-                          Icon(
-                            Icons.arrow_forward_ios,
-                            color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
-                            size: 16,
-                          ),
-                        ],
+                            // Arrow
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                              size: 16,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ],

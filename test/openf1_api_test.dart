@@ -1,8 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import '../lib/core/api/f1_api.dart';
+import 'package:f_app/core/api/f1_api.dart';
 
 // Generate mocks
 @GenerateMocks([http.Client])

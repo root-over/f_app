@@ -1622,6 +1622,79 @@ class F1Api {
   }
   
   // -----------------------------------------------------------------------------
+  // STINTS ENDPOINTS (OpenF1)
+  // -----------------------------------------------------------------------------
+  
+  /// Get tire stint information from OpenF1 API
+  /// 
+  /// Endpoint: GET /stints
+  /// Returns: Information about individual stints including tire compounds and age
+  /// 
+  /// Parameters:
+  /// - [sessionKey]: Session identifier
+  /// - [driverNumber]: Driver number (1-99)
+  /// - [compound]: Tire compound filter ("SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET")
+  /// - [stintNumber]: Stint number filter
+  /// - [lapStart]: Starting lap number filter
+  /// - [lapEnd]: Ending lap number filter
+  /// - [tyreAgeAtStart]: Filter by tire age at start
+  /// - [tyreAgeAtStartGte]: Tire age at start greater than or equal
+  /// - [tyreAgeAtStartLte]: Tire age at start less than or equal
+  /// 
+  /// Example:
+  /// ```dart
+  /// // Get all stints for session
+  /// final stints = await F1Api.getStints(sessionKey: 9158);
+  /// 
+  /// // Get stints for specific driver
+  /// final hamiltonStints = await F1Api.getStints(sessionKey: 9158, driverNumber: 44);
+  /// 
+  /// // Get soft tire stints
+  /// final softStints = await F1Api.getStints(sessionKey: 9158, compound: "SOFT");
+  /// 
+  /// // Get stints with fresh tires
+  /// final freshTires = await F1Api.getStints(sessionKey: 9158, tyreAgeAtStart: 0);
+  /// ```
+  static Future<List<dynamic>> getStints({
+    int? sessionKey,
+    int? driverNumber,
+    String? compound,
+    int? stintNumber,
+    int? lapStart,
+    int? lapEnd,
+    int? tyreAgeAtStart,
+    int? tyreAgeAtStartGte,
+    int? tyreAgeAtStartLte,
+  }) async {
+    final queryParams = <String, String>{};
+    
+    if (sessionKey != null) queryParams['session_key'] = sessionKey.toString();
+    if (driverNumber != null) queryParams['driver_number'] = driverNumber.toString();
+    if (compound != null) queryParams['compound'] = compound;
+    if (stintNumber != null) queryParams['stint_number'] = stintNumber.toString();
+    if (lapStart != null) queryParams['lap_start'] = lapStart.toString();
+    if (lapEnd != null) queryParams['lap_end'] = lapEnd.toString();
+    if (tyreAgeAtStart != null) queryParams['tyre_age_at_start'] = tyreAgeAtStart.toString();
+    if (tyreAgeAtStartGte != null) queryParams['tyre_age_at_start>'] = tyreAgeAtStartGte.toString();
+    if (tyreAgeAtStartLte != null) queryParams['tyre_age_at_start<'] = tyreAgeAtStartLte.toString();
+    
+    return _makeOpenF1Request('stints', queryParams);
+  }
+  
+  /// Get latest stint information from OpenF1 API
+  /// 
+  /// Endpoint: GET /stints?latest
+  /// Returns: Most recent stint data for all drivers
+  /// 
+  /// Example:
+  /// ```dart
+  /// final latestStints = await F1Api.getLatestStints();
+  /// ```
+  static Future<List<dynamic>> getLatestStints() async {
+    return _makeOpenF1Request('stints', {'latest': 'true'});
+  }
+  
+  // -----------------------------------------------------------------------------
   // RADIO ENDPOINTS (OpenF1) - Note: Available in documentation but may require special access
   // -----------------------------------------------------------------------------
   

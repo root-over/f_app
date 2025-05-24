@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../models/race.dart';
+import '../models/driver_standing.dart';
 import '../providers/timezone_provider.dart';
 import '../core/api/f1_api.dart';
+import 'driver_detail_screen.dart';
 
 class SessionResultsScreen extends StatefulWidget {
   final Race race;
@@ -25,10 +27,17 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
   List<dynamic> _results = [];
   List<dynamic> _livePositions = [];
   List<dynamic> _liveIntervals = [];
+  List<dynamic> _liveStints = [];
+  List<dynamic> _liveCarData = [];
+  List<dynamic> _raceControlMessages = [];
+  final Map<int, int> _previousPositions = {}; // Track previous positions for animations
   bool _isLoading = true;
   bool _isLiveSession = false;
   String? _error;
   Timer? _refreshTimer;
+  
+  // Add refresh indicator key for pull-to-refresh
+  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
 
   @override
   void initState() {
@@ -65,8 +74,8 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
     try {
       if (_isLiveSession) {
         await _loadLiveData();
-        // Start refresh timer for live data
-        _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) => _loadLiveData());
+        // Start refresh timer for live data - reduced to 5 seconds for better real-time experience
+        _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) => _loadLiveData());
       } else {
         await _loadHistoricalResults();
       }
@@ -87,14 +96,40 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
       final sessionKey = await F1Api.getCurrentSessionKey();
       
       if (sessionKey != null) {
-        // Load live positions and intervals
+        // Load live positions, intervals, and tire data
         final positions = await F1Api.getLatestPositions();
         final intervals = await F1Api.getLatestIntervals();
+        final stints = await F1Api.getLatestStints();
+        final carData = await F1Api.getLatestCarData();
+        
+        // Get race control messages for additional context
+        List<dynamic> raceControl = [];
+        try {
+          raceControl = await F1Api.getRaceControlMessages(sessionKey: sessionKey);
+          // Get only the last 5 messages to avoid clutter
+          if (raceControl.length > 5) {
+            raceControl = raceControl.sublist(raceControl.length - 5);
+          }
+        } catch (e) {
+          // Race control messages might not be available for all sessions
+        }
+        
+        // Update previous positions tracking
+        for (final position in positions) {
+          final driverNumber = position['driver_number'] as int?;
+          final currentPos = position['position'] as int?;
+          if (driverNumber != null && currentPos != null) {
+            _previousPositions[driverNumber] = currentPos;
+          }
+        }
         
         if (mounted) {
           setState(() {
             _livePositions = positions;
             _liveIntervals = intervals;
+            _liveStints = stints;
+            _liveCarData = carData;
+            _raceControlMessages = raceControl;
             _error = null;
           });
         }
@@ -371,12 +406,54 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
     }
   }
 
+  Color _getTyreColor(String compound) {
+    switch (compound.toUpperCase()) {
+      case 'SOFT':
+        return Colors.red;
+      case 'MEDIUM':
+        return Colors.yellow[700]!;
+      case 'HARD':
+        return Colors.grey[700]!;
+      case 'INTERMEDIATE':
+        return Colors.green[700]!;
+      case 'WET':
+        return Colors.blue[700]!;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Color _getFlagColor(String flag) {
+    switch (flag.toUpperCase()) {
+      case 'YELLOW':
+        return Colors.yellow[700]!;
+      case 'RED':
+        return Colors.red;
+      case 'GREEN':
+        return Colors.green;
+      case 'BLUE':
+        return Colors.blue;
+      case 'WHITE':
+        return Colors.grey[600]!;
+      case 'CHEQUERED':
+        return Colors.black;
+      default:
+        return Colors.grey[400]!;
+    }
+  }
+
   Widget _buildLiveResults() {
     if (_livePositions.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Text('Nessun dato di posizione live disponibile'),
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Text('Nessun dato di posizione live disponibile'),
+            ),
+          ),
         ),
       );
     }
@@ -414,55 +491,235 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
             ],
           ),
         ),
+        // Race control messages
+        if (_raceControlMessages.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            child: Card(
+              color: Colors.yellow[100],
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Controllo Gara',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 60,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _raceControlMessages.length,
+                        itemBuilder: (context, index) {
+                          final message = _raceControlMessages[index];
+                          final messageText = message['message'] ?? '';
+                          final flag = message['flag'] ?? '';
+                          final category = message['category'] ?? '';
+                          
+                          return Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: _getFlagColor(flag),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (flag.isNotEmpty)
+                                  Text(
+                                    flag,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                if (category.isNotEmpty)
+                                  Text(
+                                    category,
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: Text(
+                                    messageText,
+                                    style: const TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.white,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         // Positions list
         Expanded(
           child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: _livePositions.length,
             itemBuilder: (context, index) {
               final position = _livePositions[index];
+              final driverNumber = position['driver_number'] as int?;
+              
               final interval = _liveIntervals.firstWhere(
-                (i) => i['driver_number'] == position['driver_number'],
+                (i) => i['driver_number'] == driverNumber,
+                orElse: () => <String, dynamic>{},
+              );
+              
+              final stint = _liveStints.firstWhere(
+                (s) => s['driver_number'] == driverNumber,
+                orElse: () => <String, dynamic>{},
+              );
+              
+              final carDataPoint = _liveCarData.firstWhere(
+                (c) => c['driver_number'] == driverNumber,
                 orElse: () => <String, dynamic>{},
               );
               
               final pos = position['position'] ?? (index + 1);
-              final driverNumber = position['driver_number']?.toString() ?? 'N/A';
-              final gap = interval['gap'] ?? interval['interval'] ?? '';
+              final driverNumberStr = driverNumber?.toString() ?? 'N/A';
+              final gap = interval['gap_to_leader'] ?? interval['interval'] ?? '';
+              final compound = stint['compound'] ?? '';
+              final tyreAge = stint['tyre_age_at_start'] ?? '';
+              final speed = carDataPoint['speed']?.toString() ?? '';
+              final drsStatus = carDataPoint['drs'] ?? 0;
               
-              return Card(
+              // Check if position changed (for animation)
+              final previousPos = _previousPositions[driverNumber];
+              final hasPositionChanged = previousPos != null && previousPos != pos;
+              
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
                 margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _getPositionColor(pos),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Center(
-                      child: Text(
-                        pos.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                child: Card(
+                  elevation: hasPositionChanged ? 4 : 2,
+                  child: ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: _getPositionColor(pos),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: hasPositionChanged ? [
+                          BoxShadow(
+                            color: _getPositionColor(pos).withValues(alpha: 0.5),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          )
+                        ] : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          pos.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  title: Text(
-                    'Pilota #$driverNumber',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  trailing: gap.isNotEmpty
-                      ? Text(
-                          gap,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                    title: Row(
+                      children: [
+                        Text(
+                          'Pilota #$driverNumberStr',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        if (compound.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _getTyreColor(compound),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              compound.substring(0, 1), // S, M, H, I, W
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        )
-                      : null,
+                          if (tyreAge.toString().isNotEmpty)
+                            Text(
+                              ' ($tyreAge)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                        if (drsStatus > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'DRS',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    subtitle: speed.isNotEmpty
+                        ? Text(
+                            'Velocità: $speed km/h',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          )
+                        : null,
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (gap.isNotEmpty)
+                          Text(
+                            gap.toString(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        if (hasPositionChanged)
+                          Icon(
+                            previousPos > pos ? Icons.arrow_upward : Icons.arrow_downward,
+                            color: previousPos > pos ? Colors.green : Colors.red,
+                            size: 16,
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               );
             },
@@ -474,10 +731,16 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
 
   Widget _buildHistoricalResults() {
     if (_results.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Text('Nessun risultato disponibile per questa sessione'),
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Text('Nessun risultato disponibile per questa sessione'),
+            ),
+          ),
         ),
       );
     }
@@ -504,15 +767,22 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
     }
 
     if (resultsToShow.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Text('Nessun risultato disponibile per questa sessione'),
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Text('Nessun risultato disponibile per questa sessione'),
+            ),
+          ),
         ),
       );
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: resultsToShow.length,
       itemBuilder: (context, index) {
@@ -533,26 +803,26 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
     );
   }
 
-  // Calculate gap to next driver for practice sessions
-  String _calculateGapToNext(int currentIndex, List<dynamic> results) {
-    if (currentIndex >= results.length - 1) {
-      return ''; // Last driver has no gap
+  // Calculate gap from previous driver for practice sessions
+  String _calculateGapFromPrevious(int currentIndex, List<dynamic> results) {
+    if (currentIndex == 0) {
+      return ''; // First driver has no gap
     }
     
     final current = results[currentIndex];
-    final next = results[currentIndex + 1];
+    final previous = results[currentIndex - 1];
     
     final currentBestLap = current['BestLap'];
-    final nextBestLap = next['BestLap'];
+    final previousBestLap = previous['BestLap'];
     
-    if (currentBestLap?['Time']?['time'] != null && nextBestLap?['Time']?['time'] != null) {
+    if (currentBestLap?['Time']?['time'] != null && previousBestLap?['Time']?['time'] != null) {
       try {
         final currentTime = _parseTimeToSeconds(currentBestLap['Time']['time']);
-        final nextTime = _parseTimeToSeconds(nextBestLap['Time']['time']);
-        final gap = nextTime - currentTime;
+        final previousTime = _parseTimeToSeconds(previousBestLap['Time']['time']);
+        final gap = currentTime - previousTime;
         
         if (gap > 0) {
-          return '+${gap.toStringAsFixed(3)}s';
+          return '+${gap.toStringAsFixed(2)}s';
         }
       } catch (e) {
         // Error parsing times, return empty gap
@@ -578,6 +848,38 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
     }
   }
 
+  // Navigate to driver detail screen with live telemetry
+  void _navigateToDriverTelemetry(dynamic driver) {
+    if (driver == null) return;
+    
+    // Create a minimal DriverStanding object for navigation
+    final driverStanding = DriverStanding(
+      position: 1, // Placeholder position
+      points: 0.0, // Placeholder points
+      wins: 0, // Placeholder wins
+      driver: Driver(
+        driverId: driver['driverId'] ?? '',
+        permanentNumber: driver['permanentNumber']?.toString(),
+        code: driver['code'],
+        givenName: driver['givenName'] ?? '',
+        familyName: driver['familyName'] ?? '',
+        dateOfBirth: driver['dateOfBirth'] ?? '',
+        nationality: driver['nationality'] ?? '',
+      ),
+      constructors: [], // Will be populated if needed
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DriverDetailScreen(
+          driverStanding: driverStanding,
+          year: int.tryParse(widget.race.season) ?? DateTime.now().year,
+        ),
+      ),
+    );
+  }
+
   // Build practice session result tile with gap information
   Widget _buildPracticeResultTile(dynamic result, int position, dynamic driver, dynamic constructor, int index, List<dynamic> allResults) {
     final bestLap = result['BestLap'];
@@ -588,9 +890,10 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
       resultText = 'No time';
     }
     
-    final gap = _calculateGapToNext(index, allResults);
+    final gap = _calculateGapFromPrevious(index, allResults);
     
     return ListTile(
+      onTap: _isLiveSession ? () => _navigateToDriverTelemetry(driver) : null,
       leading: Container(
         width: 40,
         height: 40,
@@ -608,9 +911,24 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
           ),
         ),
       ),
-      title: Text(
-        '${driver?['givenName']} ${driver?['familyName']}',
-        style: const TextStyle(fontWeight: FontWeight.bold),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${driver?['givenName']} ${driver?['familyName']}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _isLiveSession ? Theme.of(context).colorScheme.primary : null,
+              ),
+            ),
+          ),
+          if (_isLiveSession)
+            Icon(
+              Icons.sensors,
+              size: 16,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+        ],
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,12 +943,21 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
               ),
             ),
           if (gap.isNotEmpty)
-            Text(
-              gap,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.red[600],
-                fontWeight: FontWeight.w500,
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.red[200]!),
+              ),
+              child: Text(
+                gap,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.red[700],
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
         ],
@@ -807,6 +1134,11 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
     );
   }
 
+  // Add refresh handler method
+  Future<void> _handleRefresh() async {
+    await _loadData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -868,40 +1200,50 @@ class _SessionResultsScreenState extends State<SessionResultsScreen> {
               ],
             ),
           ),
-          // Results content
+          // Results content with pull-to-refresh
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 64,
-                                color: Colors.red.withAlpha(180),
+            child: RefreshIndicator(
+              key: _refreshIndicatorKey,
+              onRefresh: _handleRefresh,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      size: 64,
+                                      color: Colors.red.withAlpha(180),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _error!,
+                                      style: const TextStyle(fontSize: 16),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _loadData,
+                                      child: const Text('Riprova'),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _error!,
-                                style: const TextStyle(fontSize: 16),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadData,
-                                child: const Text('Riprova'),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      )
-                    : _isLiveSession
-                        ? _buildLiveResults()
-                        : _buildHistoricalResults(),
+                        )
+                      : _isLiveSession
+                          ? _buildLiveResults()
+                          : _buildHistoricalResults(),
+            ),
           ),
         ],
       ),

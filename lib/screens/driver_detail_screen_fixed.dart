@@ -25,12 +25,10 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
   List<dynamic> _livePositions = [];
   List<dynamic> _liveIntervals = [];
   List<dynamic> _latestWeather = [];
+  List<dynamic> _raceControlMessages = [];
   int? _currentSessionKey;
-  
-  // Telemetry loading and racing status
-  bool _isLoadingTelemetry = false;
-  bool _isCarRacing = false;
-  DateTime? _lastTelemetryUpdate;
+  bool _isLoadingLiveData = false;
+  String? _liveDataError;
 
   // Add refresh indicator key for pull-to-refresh
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
@@ -50,6 +48,11 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
   /// Initialize live data collection
   Future<void> _initializeLiveData() async {
     try {
+      setState(() {
+        _isLoadingLiveData = true;
+        _liveDataError = null;
+      });
+
       // Get current session key
       _currentSessionKey = await F1Api.getCurrentSessionKey();
       
@@ -63,8 +66,13 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
         });
       }
     } catch (e) {
-      // Silent error handling - live data is optional
-      print('Error loading live data: $e');
+      setState(() {
+        _liveDataError = 'Errore caricamento dati live: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingLiveData = false;
+      });
     }
   }
 
@@ -92,17 +100,23 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
       final positions = await F1Api.getLatestPositions();
       final intervals = await F1Api.getLatestIntervals();
       final weather = await F1Api.getLatestWeather();
+      final raceControl = await F1Api.getRaceControlMessages(sessionKey: _currentSessionKey!);
 
       if (mounted) {
         setState(() {
           _livePositions = positions;
           _liveIntervals = intervals;
           _latestWeather = weather;
+          _raceControlMessages = raceControl.take(5).toList(); // Last 5 messages
+          _liveDataError = null;
         });
       }
     } catch (e) {
-      // Silent error handling - live data is optional
-      print('Error updating live data: $e');
+      if (mounted) {
+        setState(() {
+          _liveDataError = 'Errore aggiornamento dati: $e';
+        });
+      }
     }
   }
 
@@ -444,6 +458,18 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
                         intervals: _liveIntervals,
                       ),
                     
+                    // Race Control Messages Card (if data available)
+                    if (_raceControlMessages.isNotEmpty)
+                      _RaceControlCard(messages: _raceControlMessages),
+                    
+                    // Live Data Status Card
+                    _LiveDataStatusCard(
+                      isLoading: _isLoadingLiveData,
+                      error: _liveDataError,
+                      sessionKey: _currentSessionKey,
+                      onRefresh: () => _updateLiveData(),
+                    ),
+                    
                     const SizedBox(height: 24),
                   ],
                 ),
@@ -550,307 +576,18 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-// Enhanced Live Telemetry Card with modern UI
+// Placeholder for live data widgets that would need implementation
 class _LiveTelemetryCard extends StatelessWidget {
   final Map<String, dynamic> telemetryData;
-  
   const _LiveTelemetryCard({required this.telemetryData});
   
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 8,
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-              Theme.of(context).colorScheme.secondary.withValues(alpha: 0.05),
-            ],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.speed,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Telemetria Live',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Dati in tempo reale',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.circle,
-                          color: Colors.white,
-                          size: 8,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'LIVE',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              // Telemetry metrics in a grid
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                childAspectRatio: 2.5,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                children: [
-                  _TelemetryMetric(
-                    icon: Icons.speed,
-                    label: 'Velocità',
-                    value: '${telemetryData['speed'] ?? '--'}',
-                    unit: 'km/h',
-                    color: Colors.blue,
-                  ),
-                  _TelemetryMetric(
-                    icon: Icons.rotate_right,
-                    label: 'RPM',
-                    value: '${telemetryData['rpm'] ?? '--'}',
-                    unit: 'rpm',
-                    color: Colors.orange,
-                  ),
-                  _TelemetryMetric(
-                    icon: Icons.timeline,
-                    label: 'Marcia',
-                    value: '${telemetryData['gear'] ?? '--'}',
-                    unit: '',
-                    color: Colors.green,
-                  ),
-                  _TelemetryMetric(
-                    icon: Icons.thermostat,
-                    label: 'DRS',
-                    value: telemetryData['drs'] == true ? 'ON' : 'OFF',
-                    unit: '',
-                    color: telemetryData['drs'] == true ? Colors.green : Colors.red,
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Throttle and Brake bars
-              if (telemetryData['throttle'] != null || telemetryData['brake'] != null) ...[
-                const Divider(),
-                const SizedBox(height: 12),
-                _PedalIndicator(
-                  label: 'Acceleratore',
-                  value: (telemetryData['throttle'] ?? 0).toDouble(),
-                  color: Colors.green,
-                  icon: Icons.keyboard_arrow_up,
-                ),
-                const SizedBox(height: 8),
-                _PedalIndicator(
-                  label: 'Freno',
-                  value: (telemetryData['brake'] ?? 0).toDouble(),
-                  color: Colors.red,
-                  icon: Icons.keyboard_arrow_down,
-                ),
-              ],
-            ],
-          ),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text('Live Telemetry: ${telemetryData.toString()}'),
       ),
-    );
-  }
-}
-
-// Individual telemetry metric widget
-class _TelemetryMetric extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String unit;
-  final Color color;
-
-  const _TelemetryMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                color: color,
-                size: 16,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (unit.isNotEmpty)
-                Text(
-                  unit,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Pedal indicator (throttle/brake) widget
-class _PedalIndicator extends StatelessWidget {
-  final String label;
-  final double value; // 0-100
-  final Color color;
-  final IconData icon;
-
-  const _PedalIndicator({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final percentage = (value.clamp(0, 100) / 100);
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              icon,
-              color: color,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              '${value.toInt()}%',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          height: 6,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(3),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: percentage,
-            child: Container(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -887,6 +624,55 @@ class _LiveTimingCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Text('Live Timing for driver $driverNumber'),
+      ),
+    );
+  }
+}
+
+class _RaceControlCard extends StatelessWidget {
+  final List<dynamic> messages;
+  const _RaceControlCard({required this.messages});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text('Race Control: ${messages.length} messages'),
+      ),
+    );
+  }
+}
+
+class _LiveDataStatusCard extends StatelessWidget {
+  final bool isLoading;
+  final String? error;
+  final int? sessionKey;
+  final VoidCallback onRefresh;
+
+  const _LiveDataStatusCard({
+    required this.isLoading,
+    required this.error,
+    required this.sessionKey,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Text('Live Data Status'),
+            if (error != null) Text('Error: $error'),
+            if (sessionKey != null) Text('Session: $sessionKey'),
+            ElevatedButton(
+              onPressed: isLoading ? null : onRefresh,
+              child: Text(isLoading ? 'Loading...' : 'Refresh'),
+            ),
+          ],
+        ),
       ),
     );
   }

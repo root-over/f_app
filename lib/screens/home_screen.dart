@@ -14,6 +14,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _localeInitialized = false;
+  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
 
   @override
   void didChangeDependencies() {
@@ -27,6 +28,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _handleRefresh() async {
+    // Trigger refresh of all widgets by rebuilding the page
+    setState(() {});
+    
+    // Add a small delay to show the refresh animation
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_localeInitialized) {
@@ -36,19 +45,24 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('F1 Hub'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const NextRaceCard(),
-            const SizedBox(height: 20),
-            StandingsPreview(
-              onSeeAll: widget.onSeeAllStandings,
-            ),
-            const SizedBox(height: 20),
-            const LatestNews(),
-          ],
+      body: RefreshIndicator(
+        key: _refreshIndicatorKey,
+        onRefresh: _handleRefresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const NextRaceCard(),
+              const SizedBox(height: 20),
+              StandingsPreview(
+                onSeeAll: widget.onSeeAllStandings,
+              ),
+              const SizedBox(height: 20),
+              const LatestNews(),
+            ],
+          ),
         ),
       ),
     );

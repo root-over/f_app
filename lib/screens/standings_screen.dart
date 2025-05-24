@@ -118,6 +118,14 @@ class _DriversStandingsListState extends State<_DriversStandingsList> {
     _driverStandingsFuture = widget.apiService.getDriverStandings(year: widget.year);
   }
 
+  Future<void> _handleRefresh() async {
+    setState(() {
+      _fetchStandings();
+    });
+    // Wait for the new data to load
+    await _driverStandingsFuture;
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<DriverStanding>>(
@@ -132,9 +140,12 @@ class _DriversStandingsListState extends State<_DriversStandingsList> {
         }
 
         final drivers = snapshot.data!;
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: drivers.length,
+        return RefreshIndicator(
+          onRefresh: _handleRefresh,
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            itemCount: drivers.length,
           itemBuilder: (context, index) {
             final driverStanding = drivers[index]; // Renamed for clarity
             final driverImagePath = DriverImageUtils.getDriverImagePath(driverStanding.driver.familyName);
@@ -221,6 +232,7 @@ class _DriversStandingsListState extends State<_DriversStandingsList> {
               ),
             );
           },
+          ),
         );
       },
     );
@@ -256,6 +268,14 @@ class _ConstructorsStandingsListState extends State<_ConstructorsStandingsList> 
 
   void _fetchStandings() {
     _constructorStandingsFuture = widget.apiService.getConstructorStandings(year: widget.year);
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() {
+      _fetchStandings();
+    });
+    // Wait for the new data to load
+    await _constructorStandingsFuture;
   }
   
   // Map constructor names to their logo file names
@@ -340,9 +360,12 @@ class _ConstructorsStandingsListState extends State<_ConstructorsStandingsList> 
         }
 
         final constructors = snapshot.data!;
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: constructors.length,
+        return RefreshIndicator(
+          onRefresh: _handleRefresh,
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            itemCount: constructors.length,
           itemBuilder: (context, index) {
             final constructorStanding = constructors[index]; // Renamed for clarity
             final teamEnum = _getTeamEnumFromName(constructorStanding.constructor.name);
@@ -446,6 +469,7 @@ class _ConstructorsStandingsListState extends State<_ConstructorsStandingsList> 
               ),
             );
           },
+          ),
         );
       },
     );
