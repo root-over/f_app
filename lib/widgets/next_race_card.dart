@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../models/race.dart';
-import '../screens/race_detail_screen.dart';
+import '../screens/session_selection_screen.dart';
 import '../services/api_service.dart';
 import '../providers/timezone_provider.dart';
 
@@ -139,10 +139,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => RaceDetailScreen(
-                    race: race,
-                    sessions: race.sessions,
-                  ),
+                  builder: (context) => SessionSelectionScreen(race: race),
                 ),
               );
             },
