@@ -3,6 +3,7 @@ import 'dart:async';
 import '../models/driver_standing.dart';
 import '../core/utils/driver_image_utils.dart';
 import '../core/api/f1_api.dart';
+import '../services/live_race_service.dart';
 
 class DriverDetailScreen extends StatefulWidget {
   final DriverStanding driverStanding;
@@ -25,10 +26,20 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
   List<dynamic> _livePositions = [];
   List<dynamic> _liveIntervals = [];
   List<dynamic> _latestWeather = [];
+  List<dynamic> _raceControlMessages = [];
   int? _currentSessionKey;
+  bool _isLoadingLiveData = false;
+  String? _liveDataError;
+  
+  // Live race service integration
+  final LiveRaceService _liveRaceService = LiveRaceService.instance;
+  LiveRaceInfo? _liveRaceInfo;
+  StreamSubscription<LiveRaceStatus>? _statusSubscription;
+  StreamSubscription<List<RaceControlMessage>>? _raceControlSubscription;
   
   // Telemetry loading and racing status
   bool _isLoadingTelemetry = false;
+  bool _isInitialTelemetryLoad = true; // Track if this is the first telemetry load
   bool _isCarRacing = false;
   DateTime? _lastTelemetryUpdate;
 
@@ -39,17 +50,26 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
   void initState() {
     super.initState();
     _initializeLiveData();
+    _setupLiveRaceMonitoring();
   }
 
   @override
   void dispose() {
     _dataUpdateTimer?.cancel();
+    _statusSubscription?.cancel();
+    _raceControlSubscription?.cancel();
+    _liveRaceService.stopLiveMonitoring();
     super.dispose();
   }
 
   /// Initialize live data collection
   Future<void> _initializeLiveData() async {
     try {
+      setState(() {
+        _isLoadingLiveData = true;
+        _liveDataError = null;
+      });
+
       // Get current session key
       _currentSessionKey = await F1Api.getCurrentSessionKey();
       
@@ -63,8 +83,13 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
         });
       }
     } catch (e) {
-      // Silent error handling - live data is optional
-      print('Error loading live data: $e');
+      setState(() {
+        _liveDataError = 'Errore caricamento dati live: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingLiveData = false;
+      });
     }
   }
 
@@ -78,12 +103,43 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
           ? int.tryParse(widget.driverStanding.driver.permanentNumber!)
           : null;
 
-      // Update telemetry data for this driver
+      // Update telemetry data for this driver with loading state
       if (driverNumber != null) {
+        // Only show loading spinner during initial load
+        if (mounted && _isInitialTelemetryLoad) {
+          setState(() {
+            _isLoadingTelemetry = true;
+          });
+        }
+        
         final telemetry = await F1Api.getLiveTelemetry(driverNumber);
-        if (mounted) {
+        
+        if (mounted && telemetry.isNotEmpty) {
+          final latestTelemetry = telemetry.last;
+          final currentTime = DateTime.now();
+          
+          // Determine if car is racing based on telemetry data
+          final speed = latestTelemetry['speed'] ?? 0;
+          final rpm = latestTelemetry['rpm'] ?? 0;
+          final gear = latestTelemetry['gear'] ?? 0;
+          
+          // Car is considered racing if:
+          // - Speed > 50 km/h OR
+          // - RPM > 5000 OR  
+          // - Gear > 1 (not in neutral/1st gear)
+          final isRacing = speed > 50 || rpm > 5000 || gear > 1;
+          
           setState(() {
             _liveTelemetry = telemetry;
+            _isCarRacing = isRacing;
+            _lastTelemetryUpdate = currentTime;
+            _isLoadingTelemetry = false;
+            _isInitialTelemetryLoad = false; // Mark initial load as complete
+          });
+        } else if (mounted) {
+          setState(() {
+            _isLoadingTelemetry = false;
+            _isInitialTelemetryLoad = false; // Mark initial load as complete even if no data
           });
         }
       }
@@ -92,18 +148,52 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
       final positions = await F1Api.getLatestPositions();
       final intervals = await F1Api.getLatestIntervals();
       final weather = await F1Api.getLatestWeather();
+      final raceControl = await F1Api.getRaceControlMessages(sessionKey: _currentSessionKey!);
 
       if (mounted) {
         setState(() {
           _livePositions = positions;
           _liveIntervals = intervals;
           _latestWeather = weather;
+          _raceControlMessages = raceControl.take(5).toList(); // Last 5 messages
+          _liveDataError = null;
         });
       }
     } catch (e) {
-      // Silent error handling - live data is optional
-      print('Error updating live data: $e');
+      if (mounted) {
+        setState(() {
+          _liveDataError = 'Errore aggiornamento dati: $e';
+          _isLoadingTelemetry = false;
+        });
+      }
     }
+  }
+
+  /// Setup live race monitoring with flag detection
+  void _setupLiveRaceMonitoring() {
+    // Start live race monitoring service
+    _liveRaceService.startLiveMonitoring();
+    
+    // Listen to race status changes
+    _statusSubscription = _liveRaceService.liveStatusStream.listen((status) {
+      if (mounted) {
+        setState(() {
+          _liveRaceInfo = _liveRaceService.getCurrentRaceInfo();
+          
+          // Update car racing status based on live race status
+          _isCarRacing = _liveRaceInfo?.isLive ?? false;
+        });
+      }
+    });
+    
+    // Listen to race control messages
+    _raceControlSubscription = _liveRaceService.raceControlStream.listen((messages) {
+      if (mounted) {
+        setState(() {
+          // Race control messages are automatically updated in the service
+        });
+      }
+    });
   }
 
   /// Calculate age from date of birth
@@ -193,6 +283,11 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
 
   // Add refresh handler method
   Future<void> _handleRefresh() async {
+    // Reset initial load flag to show loading during manual refresh
+    setState(() {
+      _isInitialTelemetryLoad = true;
+    });
+    
     // Refresh live data
     await _updateLiveData();
   }
@@ -428,9 +523,18 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
                       ),
                     const SizedBox(height: 16),
                     
-                    // Live Telemetry Card (if data available)
-                    if (_liveTelemetry.isNotEmpty)
-                      _LiveTelemetryCard(telemetryData: _liveTelemetry.last),
+                    // Live Race Status Card (showing current race state)
+                    if (_liveRaceInfo != null)
+                      _LiveRaceStatusCard(raceInfo: _liveRaceInfo!),
+                    
+                    // Live Telemetry Card (if data available or loading)
+                    if (_liveTelemetry.isNotEmpty || _isLoadingTelemetry)
+                      _LiveTelemetryCard(
+                        telemetryData: _liveTelemetry.isNotEmpty ? _liveTelemetry.last : {},
+                        isLoading: _isLoadingTelemetry,
+                        isCarRacing: _isCarRacing,
+                        lastUpdate: _lastTelemetryUpdate,
+                      ),
                     
                     // Weather Conditions Card (if data available)
                     if (_latestWeather.isNotEmpty)
@@ -443,6 +547,18 @@ class _DriverDetailScreenState extends State<DriverDetailScreen> {
                         positions: _livePositions,
                         intervals: _liveIntervals,
                       ),
+                    
+                    // Race Control Messages Card (if data available)
+                    if (_raceControlMessages.isNotEmpty)
+                      _RaceControlCard(messages: _raceControlMessages),
+                    
+                    // Live Data Status Card
+                    _LiveDataStatusCard(
+                      isLoading: _isLoadingLiveData,
+                      error: _liveDataError,
+                      sessionKey: _currentSessionKey,
+                      onRefresh: () => _updateLiveData(),
+                    ),
                     
                     const SizedBox(height: 24),
                   ],
@@ -553,11 +669,67 @@ class _InfoRow extends StatelessWidget {
 // Enhanced Live Telemetry Card with modern UI
 class _LiveTelemetryCard extends StatelessWidget {
   final Map<String, dynamic> telemetryData;
+  final bool isLoading;
+  final bool isCarRacing;
+  final DateTime? lastUpdate;
   
-  const _LiveTelemetryCard({required this.telemetryData});
+  const _LiveTelemetryCard({
+    required this.telemetryData,
+    this.isLoading = false,
+    this.isCarRacing = false,
+    this.lastUpdate,
+  });
   
   @override
   Widget build(BuildContext context) {
+    // Show loading state
+    if (isLoading) {
+      return Card(
+        elevation: 8,
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                Theme.of(context).colorScheme.secondary.withValues(alpha: 0.05),
+              ],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(width: 16),
+                    Text(
+                      'Caricamento telemetria...',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Recupero dati in tempo reale',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Card(
       elevation: 8,
       margin: const EdgeInsets.only(bottom: 16),
@@ -578,57 +750,60 @@ class _LiveTelemetryCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // Header with racing status
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.speed,
-                      color: Colors.white,
-                      size: 24,
-                    ),
+                  Icon(
+                    Icons.sensors,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 28,
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Telemetria Live',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Telemetria Live',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Dati in tempo reale',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ],
+                        if (lastUpdate != null)
+                          Text(
+                            'Ultimo aggiornamento: ${_formatTime(lastUpdate!)}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                  const Spacer(),
+                  // Racing status indicator
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(12),
+                      color: isCarRacing ? Colors.green : Colors.orange,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
-                          Icons.circle,
+                        Icon(
+                          isCarRacing ? Icons.play_arrow : Icons.pause,
                           color: Colors.white,
-                          size: 8,
+                          size: 16,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'LIVE',
+                          isCarRacing ? 'RACING' : 'IDLE',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -639,6 +814,7 @@ class _LiveTelemetryCard extends StatelessWidget {
                   ),
                 ],
               ),
+                
               const SizedBox(height: 20),
               
               // Telemetry metrics in a grid
@@ -707,9 +883,22 @@ class _LiveTelemetryCard extends StatelessWidget {
       ),
     );
   }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+    
+    if (difference.inSeconds < 60) {
+      return '${difference.inSeconds}s fa';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m fa';
+    } else {
+      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    }
+  }
 }
 
-// Individual telemetry metric widget
+// Widget for individual telemetry metrics
 class _TelemetryMetric extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -730,15 +919,15 @@ class _TelemetryMetric extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          color: color.withValues(alpha: 0.3),
+          width: 1,
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
             children: [
@@ -747,38 +936,38 @@ class _TelemetryMetric extends StatelessWidget {
                 color: color,
                 size: 16,
               ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 4),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Expanded(
-                child: Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
                 ),
               ),
-              if (unit.isNotEmpty)
+              if (unit.isNotEmpty) ...[
+                const SizedBox(width: 2),
                 Text(
                   unit,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: color.withValues(alpha: 0.7),
                   ),
                 ),
+              ],
             ],
           ),
         ],
@@ -787,10 +976,10 @@ class _TelemetryMetric extends StatelessWidget {
   }
 }
 
-// Pedal indicator (throttle/brake) widget
+// Widget for pedal indicators (throttle/brake)
 class _PedalIndicator extends StatelessWidget {
   final String label;
-  final double value; // 0-100
+  final double value;
   final Color color;
   final IconData icon;
 
@@ -803,10 +992,9 @@ class _PedalIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final percentage = (value.clamp(0, 100) / 100);
+    final percentage = (value / 100).clamp(0.0, 1.0);
     
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
@@ -889,5 +1077,268 @@ class _LiveTimingCard extends StatelessWidget {
         child: Text('Live Timing for driver $driverNumber'),
       ),
     );
+  }
+}
+
+class _RaceControlCard extends StatelessWidget {
+  final List<dynamic> messages;
+  const _RaceControlCard({required this.messages});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text('Race Control: ${messages.length} messages'),
+      ),
+    );
+  }
+}
+
+class _LiveDataStatusCard extends StatelessWidget {
+  final bool isLoading;
+  final String? error;
+  final int? sessionKey;
+  final VoidCallback onRefresh;
+
+  const _LiveDataStatusCard({
+    required this.isLoading,
+    required this.error,
+    required this.sessionKey,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Text('Live Data Status'),
+            if (error != null) Text('Error: $error'),
+            if (sessionKey != null) Text('Session: $sessionKey'),
+            ElevatedButton(
+              onPressed: isLoading ? null : onRefresh,
+              child: Text(isLoading ? 'Loading...' : 'Refresh'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Live Race Status Card showing current race state, flags, and safety car
+class _LiveRaceStatusCard extends StatelessWidget {
+  final LiveRaceInfo raceInfo;
+  
+  const _LiveRaceStatusCard({
+    required this.raceInfo,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 8,
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              Theme.of(context).colorScheme.secondary.withValues(alpha: 0.05),
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with race status
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(raceInfo.status),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _getStatusIcon(raceInfo.status),
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Stato Gara',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          raceInfo.statusText,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: _getStatusColor(raceInfo.status),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Live indicator if race is live
+                  if (raceInfo.isLive)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'LIVE',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+                
+              const SizedBox(height: 16),
+              
+              // Race control messages (if any)
+              if (raceInfo.recentRaceControl.isNotEmpty) ...[
+                const Divider(),
+                const SizedBox(height: 12),
+                Text(
+                  'Controllo Gara',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 60,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: raceInfo.recentRaceControl.length,
+                    itemBuilder: (context, index) {
+                      final message = raceInfo.recentRaceControl[index];
+                      return Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Color(message.color),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              message.icon,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(height: 4),
+                            Expanded(
+                              child: Text(
+                                message.message ?? message.category ?? 'Info',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(LiveRaceStatus status) {
+    switch (status) {
+      case LiveRaceStatus.racing:
+        return Colors.green;
+      case LiveRaceStatus.paused:
+        return Colors.orange;
+      case LiveRaceStatus.yellowFlag:
+        return Colors.yellow[700]!;
+      case LiveRaceStatus.redFlag:
+        return Colors.red;
+      case LiveRaceStatus.safetyCar:
+      case LiveRaceStatus.virtualSafetyCar:
+        return Colors.amber[700]!;
+      case LiveRaceStatus.finished:
+        return Colors.grey[600]!;
+      case LiveRaceStatus.notLive:
+      case LiveRaceStatus.noSession:
+        return Colors.grey;
+      case LiveRaceStatus.error:
+        return Colors.red[800]!;
+      case LiveRaceStatus.unknown:
+        return Colors.grey[400]!;
+    }
+  }
+
+  IconData _getStatusIcon(LiveRaceStatus status) {
+    switch (status) {
+      case LiveRaceStatus.racing:
+        return Icons.play_arrow;
+      case LiveRaceStatus.paused:
+        return Icons.pause;
+      case LiveRaceStatus.yellowFlag:
+        return Icons.flag;
+      case LiveRaceStatus.redFlag:
+        return Icons.stop;
+      case LiveRaceStatus.safetyCar:
+        return Icons.directions_car;
+      case LiveRaceStatus.virtualSafetyCar:
+        return Icons.computer;
+      case LiveRaceStatus.finished:
+        return Icons.sports_score;
+      case LiveRaceStatus.notLive:
+      case LiveRaceStatus.noSession:
+        return Icons.tv_off;
+      case LiveRaceStatus.error:
+        return Icons.error;
+      case LiveRaceStatus.unknown:
+        return Icons.help;
+    }
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../models/race.dart';
 import '../screens/session_selection_screen.dart';
 import '../services/api_service.dart';
+import '../services/live_race_service.dart';
 import '../providers/timezone_provider.dart';
 
 class NextRaceCard extends StatefulWidget {
@@ -16,11 +18,33 @@ class NextRaceCard extends StatefulWidget {
 
 class _NextRaceCardState extends State<NextRaceCard> {
   late Future<Race?> _nextRaceFuture;
+  final LiveRaceService _liveRaceService = LiveRaceService.instance;
+  LiveRaceInfo? _liveRaceInfo;
+  StreamSubscription<LiveRaceInfo>? _liveRaceSubscription;
 
   @override
   void initState() {
     super.initState();
     _nextRaceFuture = _fetchNextRace();
+    _setupLiveRaceMonitoring();
+  }
+
+  void _setupLiveRaceMonitoring() {
+    _liveRaceService.startLiveMonitoring();
+    
+    _liveRaceSubscription = _liveRaceService.liveRaceInfoStream.listen((liveInfo) {
+      if (mounted) {
+        setState(() {
+          _liveRaceInfo = liveInfo;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _liveRaceSubscription?.cancel();
+    super.dispose();
   }
 
   Future<Race?> _fetchNextRace() async {
@@ -37,6 +61,165 @@ class _NextRaceCardState extends State<NextRaceCard> {
     } catch (_) {
       return races.isNotEmpty ? races.last : null;
     }
+  }
+
+  Widget _buildLiveStatusWidget(LiveRaceInfo liveInfo) {
+    final status = liveInfo.status;
+    final latestMessage = liveInfo.raceControlMessages.isNotEmpty 
+        ? liveInfo.raceControlMessages.first 
+        : null;
+
+    // Colori basati sullo stato
+    Color statusColor;
+    String statusText;
+    IconData statusIcon;
+
+    switch (status) {
+      case LiveRaceStatus.racing:
+        statusColor = Colors.green;
+        statusText = 'GARA LIVE';
+        statusIcon = Icons.speed;
+        break;
+      case LiveRaceStatus.paused:
+        statusColor = Colors.orange;
+        statusText = 'GARA SOSPESA';
+        statusIcon = Icons.pause;
+        break;
+      case LiveRaceStatus.yellowFlag:
+        statusColor = Colors.yellow.shade700;
+        statusText = 'BANDIERA GIALLA';
+        statusIcon = Icons.flag;
+        break;
+      case LiveRaceStatus.redFlag:
+        statusColor = Colors.red;
+        statusText = 'BANDIERA ROSSA';
+        statusIcon = Icons.flag;
+        break;
+      case LiveRaceStatus.safetyCar:
+        statusColor = Colors.orange;
+        statusText = 'SAFETY CAR';
+        statusIcon = Icons.car_crash;
+        break;
+      case LiveRaceStatus.virtualSafetyCar:
+        statusColor = Colors.amber;
+        statusText = 'VSC';
+        statusIcon = Icons.warning;
+        break;
+      case LiveRaceStatus.finished:
+        statusColor = Colors.blue;
+        statusText = 'GARA FINITA';
+        statusIcon = Icons.flag_outlined;
+        break;
+      default:
+        statusColor = Colors.green;
+        statusText = 'LIVE';
+        statusIcon = Icons.live_tv;
+        break;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Indicatore stato principale
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: statusColor.withValues(alpha: 0.3),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Animazione pulsante per stati live
+              if (status == LiveRaceStatus.racing)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 700),
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.3, end: 1),
+                    duration: const Duration(milliseconds: 700),
+                    builder: (context, value, child) {
+                      return Opacity(opacity: value, child: child);
+                    },
+                    child: const SizedBox.expand(),
+                  ),
+                )
+              else
+                Icon(
+                  statusIcon,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              if (status != LiveRaceStatus.racing) const SizedBox(width: 4),
+              Text(
+                statusText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Messaggio race control se disponibile
+        if (latestMessage != null) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  latestMessage.icon,
+                  style: const TextStyle(fontSize: 10),
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    latestMessage.message != null 
+                        ? (latestMessage.message!.length > 20 
+                            ? '${latestMessage.message!.substring(0, 20)}...'
+                            : latestMessage.message!)
+                        : 'Race control message',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   @override
@@ -70,7 +253,16 @@ class _NextRaceCardState extends State<NextRaceCard> {
         final difference = raceDateTimeLocal.difference(now);
         String timeLeft = '';
         Widget? statusWidget;
-        if (difference.inSeconds > 0) {
+        
+        // Verifica se abbiamo dati live e se la gara potrebbe essere in corso
+        bool isRaceTimeWindow = difference.inSeconds <= 0 && difference.inSeconds > -7200; // Entro 2h dall'inizio
+        
+        if (_liveRaceInfo != null && _liveRaceInfo!.status != LiveRaceStatus.notLive && 
+            _liveRaceInfo!.status != LiveRaceStatus.noSession && isRaceTimeWindow) {
+          // Usa il widget di stato live avanzato
+          statusWidget = _buildLiveStatusWidget(_liveRaceInfo!);
+          timeLeft = '';
+        } else if (difference.inSeconds > 0) {
           // Calcolo giorni: ogni scatto di mezzanotte conta come un giorno
           final todayTz = tz.TZDateTime(timezoneProvider.currentLocation, now.year, now.month, now.day);
           int giorni = raceDateTimeLocal.difference(todayTz).inDays;
@@ -90,7 +282,8 @@ class _NextRaceCardState extends State<NextRaceCard> {
           } else {
             timeLeft = 'Tra ${difference.inMinutes} min';
           }
-        } else if (difference.inSeconds <= 0 && difference.inSeconds > -7200) { // Gara in corso (entro 2h)
+        } else if (difference.inSeconds <= 0 && difference.inSeconds > -7200) { // Gara dovrebbe essere in corso
+          // Fallback per quando non abbiamo dati live ma la gara dovrebbe essere in corso
           statusWidget = Row(
             children: [
               AnimatedContainer(
@@ -103,7 +296,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF4CAF50).withAlpha((255 * 0.5).round()), // Usa un colore non deprecato
+                      color: const Color(0xFF4CAF50).withValues(alpha: 0.5),
                       blurRadius: 8,
                       spreadRadius: 1,
                     ),
@@ -153,7 +346,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
                   end: Alignment.bottomRight,
                   colors: [
                     Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.primary.withAlpha((0.7 * 255).toInt()),
+                    Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
                   ],
                 ),
               ),
@@ -192,7 +385,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
                   Text(
                     race.circuit.circuitName,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary.withAlpha((0.9 * 255).toInt()),
+                      color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
                       fontSize: 16,
                     ),
                   ),
@@ -206,7 +399,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
                           Text(
                             'DATA',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onPrimary.withAlpha((0.8 * 255).toInt()),
+                              color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.8),
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -224,7 +417,7 @@ class _NextRaceCardState extends State<NextRaceCard> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.onPrimary.withAlpha((0.2 * 255).toInt()),
+                          color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: statusWidget ?? Text(
